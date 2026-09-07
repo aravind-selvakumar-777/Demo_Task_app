@@ -1,62 +1,66 @@
 import { FormEvent, useState } from 'react';
 import './App.css';
-
-type Task = {
-  id: number;
-  title: string;
-  status: 'open' | 'done';
-  priority: 'Low' | 'Medium' | 'High';
-};
-
-const starterTasks: Task[] = [
-  { id: 1, title: 'Review the landing copy', status: 'open', priority: 'High' },
-  { id: 2, title: 'Prepare demo data', status: 'open', priority: 'Medium' },
-  { id: 3, title: 'Send summary to the team', status: 'done', priority: 'Low' },
-];
+import { useTaskPersistence } from './hooks/useTaskPersistence';
+import { Task } from './types/Task';
 
 function App() {
-  const [tasks, setTasks] = useState<Task[]>(starterTasks);
+  // Task state management and auto-persistence
+  const { tasks, addTask, updateTask, deleteTask, storageError } = useTaskPersistence();
+
+  // Local form state
   const [title, setTitle] = useState('');
   const [priority, setPriority] = useState<Task['priority']>('Medium');
   const [filter, setFilter] = useState<'all' | Task['status']>('all');
+  const [addError, setAddError] = useState<string | null>(null);
 
   const visibleTasks = tasks.filter((task) => filter === 'all' || task.status === filter);
   const completedCount = tasks.filter((task) => task.status === 'done').length;
   const openCount = tasks.length - completedCount;
 
-  function addTask(event: FormEvent<HTMLFormElement>) {
+  function handleAddTask(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const trimmedTitle = title.trim();
+    setAddError(null);
 
+    const trimmedTitle = title.trim();
     if (!trimmedTitle) {
+      setAddError('Task title is required');
       return;
     }
 
-    setTasks((currentTasks) => [
-      { id: Date.now(), title: trimmedTitle, status: 'open', priority },
-      ...currentTasks,
-    ]);
-    setTitle('');
-    setPriority('Medium');
+    // Call hook's addTask with new task data
+    const result = addTask({
+      title: trimmedTitle,
+      status: 'open',
+      priority,
+    });
+
+    // Handle result codes from hook
+    if (result === 'success') {
+      // Clear form on successful creation
+      setTitle('');
+      setPriority('Medium');
+    } else if (result === 'max_limit_exceeded') {
+      setAddError('Maximum 8 tasks reached. Delete a task to add more.');
+    } else if (result === 'priority_required') {
+      setAddError('Priority is required');
+    }
   }
 
   function toggleTask(taskId: number) {
-    setTasks((currentTasks) =>
-      currentTasks.map((task) =>
-        task.id === taskId
-          ? { ...task, status: task.status === 'open' ? 'done' : 'open' }
-          : task,
-      ),
-    );
-  }
-
-  function deleteTask(taskId: number) {
-    setTasks((currentTasks) => currentTasks.filter((task) => task.id !== taskId));
+    updateTask(taskId, { status: tasks.find(t => t.id === taskId)?.status === 'open' ? 'done' : 'open' });
   }
 
   return (
     <main className="app-shell">
       <section className="workspace-panel" aria-labelledby="app-title">
+        {/* Storage error notification */}
+        {storageError && (
+          <div className="error-banner" role="alert">
+            <span>⚠️ Persistence error: {storageError}</span>
+            <span> Data is saved in memory only.</span>
+          </div>
+        )}
+
         <div className="hero-row">
           <div>
             <p className="eyebrow">Sample web app</p>
@@ -80,7 +84,7 @@ function App() {
           </div>
         </div>
 
-        <form className="task-form" onSubmit={addTask}>
+        <form className="task-form" onSubmit={handleAddTask}>
           <label>
             <span>Task name</span>
             <input
@@ -100,7 +104,17 @@ function App() {
           </label>
 
           <button type="submit">Add task</button>
+
+          {/* Form validation error */}
+          {addError && <div className="form-error">{addError}</div>}
         </form>
+
+        {/* Max tasks warning */}
+        {tasks.length === 8 && (
+          <div className="info-banner" role="status">
+            ℹ️ Maximum 8 tasks reached. Delete a task to add more.
+          </div>
+        )}
 
         <div className="toolbar" aria-label="Task filters">
           {(['all', 'open', 'done'] as const).map((option) => (
