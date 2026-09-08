@@ -38,14 +38,15 @@ flowchart LR
 | Component | File | Responsibility |
 | --- | --- | --- |
 | `App` | `src/App.tsx` | Owns UI state (form inputs), renders the board, calls `setTasks`/`setFilter` from the persistence hook on add/toggle/delete/filter actions. Unchanged in shape from today except it swaps `useState` for `useLocalStorageState` for `tasks` and `filter`, and drops `starterTasks` as the initial value. |
-| `Task` type + type guards | `src/App.tsx` (colocated with the existing `Task` type) | Pure, framework-free validation: `isTask(value)`, `isTaskArray(value)`, `isFilterValue(value)`. These describe "what a valid persisted value looks like" and are the single source of truth for FR-007/FR-008 shape checks. Kept next to `Task` because they must stay in sync with that type; extracting them to a separate module is unnecessary at this size (see Open Decisions). |
-| `useLocalStorageState<T>` hook | `src/hooks/useLocalStorageState.ts` (new) | Generic, reusable persistence primitive. On first render, lazily reads a given key from `localStorage`, JSON-parses it, and runs a caller-supplied validator; falls back to the caller-supplied default on any missing key, parse error, validator failure, or thrown read error. Returns a `[state, setState]` pair with the same shape as `useState`. On every state change, serializes and writes to `localStorage` inside a `try/catch` that swallows write errors silently. Contains no knowledge of `Task` or `filter` — it only knows "key, default value, validator." |
+| `Task` type + type guards | `src/App.tsx` (colocated with the existing `Task` type) | Pure, framework-free validation: `isTask(value)`, `isTaskArray(value)`, `isFilterValue(value)`. These describe "what a valid persisted value looks like" and are the single source of truth for FR-007/FR-008 shape checks. Kept next to `Task` because they must stay in sync with that type; extracting them to a separate module is unnecessary at this size (see Decisions Confirmed in Design Review). |
+| `useLocalStorageState<T>` hook | `src/hooks/useLocalStorageState.ts` (new) | Generic, reusable persistence primitive. On first render, lazily reads a given key from `localStorage`, JSON-parses it, and runs a caller-supplied validator; falls back to the caller-supplied default on any missing key, parse error, validator failure, or thrown read error. Returns a `[state, setState]` pair with the same shape as `useState`. **`setState` is the underlying `useState` setter, forwarded unchanged** — it is not wrapped — so it fully supports both the direct-value form and the functional-updater form (`setState(prev => next)`) that `App.tsx`'s existing `addTask`/`toggleTask`/`deleteTask` handlers already rely on. Persistence write logic runs in a **separate `useEffect` keyed on `[key, state]`**, executed after the state update commits, serializing and writing to `localStorage` inside a `try/catch` that swallows write errors silently. **The write never runs inside the `setState` updater function itself** — persistence I/O is deliberately kept out of the render/reducer phase so it stays side-effect-free and safe under `<StrictMode>`'s intentional double-invocation of updater functions. Contains no knowledge of `Task` or `filter` — it only knows "key, default value, validator." |
 | `window.localStorage` | Browser API | Durable key/value store scoped to origin + browser profile. Treated as an untrusted, possibly-unavailable I/O boundary — every access goes through the hook's try/catch. |
 
 State ownership:
 
 - **React state (`tasks`, `filter`) is the single source of truth during a session.** All reads (filtering, counts, rendering) happen against React state, never against `localStorage` directly, so persistence failures never affect in-session behavior (NFR-002).
 - **`localStorage` is a one-way mirror of React state**, updated after every committed state change. The only direction data flows *from* storage *into* React state is the one-time read at initial mount.
+- **The hook's `setState` is React's own state setter, unwrapped.** No side effects (including `localStorage.setItem`) run inside a `setState` updater function; all persistence I/O happens in a `useEffect` that observes the committed state value. This is a deliberate decision (see Design Review, Finding D-01) to avoid the anti-pattern of side effects inside state updaters, which is unsafe under `<StrictMode>` and concurrent rendering.
 - **Form draft state (`title`, `priority` input)** stays local, ephemeral `useState` in `App.tsx` — it is not part of the persisted `Task`/filter model and is out of scope for this story.
 
 ## Technology Choices
@@ -56,7 +57,7 @@ State ownership:
 | One generic hook (`useLocalStorageState`) reused for both `tasks` and `filter` | Avoids writing the same read/validate/write/try-catch logic twice; keeps the get/set call sites in `App.tsx` looking like ordinary `useState`. | Two separate inline `useEffect`/lazy-`useState` blocks directly in `App.tsx`, one per field. Viable for this app's size, but duplicates logic and is harder to unit test in isolation. |
 | Runtime type guards (`isTaskArray`, `isFilterValue`) instead of a schema library (e.g., zod) | The shape is small and fixed (4 fields, 2 enums); hand-written guards are a few lines and have zero dependencies. | A schema-validation library — rejected as over-engineering for a shape this small and static. |
 | No state-management library (Redux/Zustand/etc.) | Only two state values need persistence; React's built-in `useState`/`useEffect` composed into one hook is sufficient. | N/A — introducing a library would be over-engineering per the stated constraints. |
-| No versioned storage keys / migration layer | Requirements explicitly exclude schema versioning and migration (Out of scope; Assumptions). | If the team wants cheap future-proofing without building migration logic, a plain namespaced key (e.g. `taskboard.tasks`) is enough; see Open Decisions for the optional `v1` suffix variant. |
+| No versioned storage keys / migration layer | Requirements explicitly exclude schema versioning and migration (Out of scope; Assumptions). | A `:v1` key suffix was considered and rejected for now; see Decisions Confirmed in Design Review. |
 
 ## Data Model and State Ownership
 
@@ -81,7 +82,7 @@ Storage keys (namespaced to avoid collisions with any other app at the same orig
 | Task list | `taskboard.tasks` | JSON array of `Task` |
 | Active filter | `taskboard.filter` | JSON string, one of `'all' \| 'open' \| 'done'` |
 
-No versioning/migration metadata is stored (explicitly out of scope). If the team later wants cheap forward-compatibility, an optional convention is to suffix keys with `:v1` (e.g. `taskboard.tasks:v1`) purely as a naming convention — this adds no migration *logic*, just gives a future developer an easy way to introduce a `:v2` key and treat the old key as "unknown/malformed" (i.e., it would naturally fall through FR-007's discard-and-fallback path). This is a naming choice, not a required part of this story.
+No versioning/migration metadata is stored (explicitly out of scope). The optional `:v1` key-suffix naming convention was considered and is **not** adopted for this story (see Decisions Confirmed in Design Review); plain keys are used.
 
 State ownership summary:
 
@@ -141,6 +142,8 @@ sequenceDiagram
     Hook-->>App: tasks reflect nextTasks regardless of write outcome
 ```
 
+Note on timing: the `setItem` step above runs inside a `useEffect` scheduled after the state update commits — it is not executed synchronously inside the `setTasks` call. This keeps the write out of the render/reducer phase (see State ownership, above) at the cost of a small, accepted timing gap between "state updated" and "write flushed"; see Assumptions and Risks.
+
 This satisfies FR-001 (write full list on every successful mutation), FR-009 (silent write-failure handling), AC-003, AC-008, and NFR-002 (UI stays usable even if the write fails).
 
 ### Filter change → persist
@@ -167,19 +170,27 @@ Identical shape to the mutation flow above, but triggered by `setFilter(nextFilt
 | FR-012, BR-002, BR-005, AC-009 | All persistence stays inside `window.localStorage`; no network calls, no auth, no sync mechanism are introduced. |
 | BR-003 | No bulk clear/reset API is added; `deleteTask` remains the only removal path, unchanged. |
 | BR-004 | Write errors are caught and ignored; no UI element surfaces a persistence error. |
-| NFR-001 | `localStorage` calls are synchronous and used directly in the render/commit cycle; no async layer or loading indicator is introduced. |
+| NFR-001 | `localStorage` calls are synchronous and cheap; the write runs in a post-commit `useEffect` (see Key Data Flows) rather than an async layer, and no loading indicator is introduced. |
 
 ## Assumptions and Risks
 
 - **Key names** (`taskboard.tasks`, `taskboard.filter`) are an implementation choice, as the requirements leave this to the implementer. They are namespaced with a `taskboard.` prefix to reduce collision risk with other apps at the same origin.
 - **StrictMode double-invocation**: React's `<React.StrictMode>` (already used in `main.tsx`) invokes lazy initializers twice in development. This is safe here because the hook's read path is a pure, idempotent read — running it twice produces the same result and has no side effects.
-- **Write-after-restore no-op**: because the write effect is keyed on the `tasks`/`filter` state value, it also fires once right after the initial restore, re-writing the same data back to `localStorage`. This is harmless (idempotent) but technically an extra write on every load; not eliminated here to avoid adding an "is this the first render" guard, per the instruction to keep the design minimal. See Open Decisions.
+- **Write-after-restore no-op**: because the write effect is keyed on the `tasks`/`filter` state value, it also fires once right after the initial restore, re-writing the same data back to `localStorage`. This is harmless (idempotent) but technically an extra write on every load; not eliminated here to avoid adding an "is this the first render" guard, per the instruction to keep the design minimal. See Decisions Confirmed in Design Review.
 - **Multi-tab writes**: if the app is open in two tabs of the same browser, the last tab to write "wins," per the requirements' explicit note that this is unaddressed and untested by this story. No cross-tab coordination (e.g., `storage` event listener) is added.
 - **No user-facing indication of persistence failure**: per BR-004, this is required behavior, but it also means a user in a fully storage-disabled environment (e.g., strict private browsing) gets no signal that their work will not survive a refresh. This is an accepted risk per the confirmed requirements, not a defect to fix here.
+- **Write-timing edge case (post-commit effect vs. instantaneous unload)**: because the write runs in a `useEffect` after commit rather than synchronously inside the triggering event handler, there is a theoretical edge case where an instantaneous tab close/crash immediately after the last action could occur before the effect flushes, losing that single last write. This is accepted as consistent with NFR-001 (standard synchronous `localStorage` calls are sufficient; no flush-on-unload mechanism is required) and cannot be verified without a real browser; it is not a defect in this design.
+- **`localStorage` access itself can throw, not just its methods**: in some restricted environments (e.g., certain private-browsing modes), reading the `window.localStorage` property can throw a `SecurityError` before `.getItem`/`.setItem` is even called. The implementation must wrap the property access itself inside the `try` block, not just the method call, or a read/write failure could escape the catch and violate FR-009/FR-010.
 
-## Open Decisions
+## Decisions Confirmed in Design Review
 
-- Whether to add a first-render guard to skip the redundant "write back identical data" effect run immediately after restore (pure optimization, not required for correctness).
-- Whether to log persistence failures to the developer console (`console.warn`) for local debugging, without surfacing anything to the user. Not required by the requirements; would not affect behavior either way.
-- Whether validators (`isTask`, `isTaskArray`, `isFilterValue`) should be extracted out of `App.tsx` into their own module if the component grows further. Not needed at the current size.
-- Whether to adopt the optional `:v1` key-naming convention now (no migration logic, just a naming placeholder) versus the plain key name — both satisfy the requirements identically since versioning/migration is out of scope.
+The following were listed as open decisions and have been resolved (see `design-review.md` for full rationale); none require further discussion before implementation:
+
+- **First-render write-back guard**: Not added. The redundant "write back identical data" effect run immediately after restore (and its `<StrictMode>`-doubled dev-only variant) is harmless because the write is idempotent. Adding an `isFirstRender` ref guard would add complexity with no functional benefit, contrary to the smallest-architecture goal.
+- **Developer-console logging of persistence failures**: Not added by default. `console.warn` in the catch blocks would not violate BR-004 (which governs user-facing surfaces, not developer tools), but it is not required by any requirement and is left as a future, optional enhancement rather than part of this design.
+- **Location of type guards**: Kept colocated with the `Task` type in `App.tsx` for now. Extraction into a separate module is deferred until the component grows enough to justify it (YAGNI).
+- **`:v1` key-naming convention**: Not adopted. Plain keys (`taskboard.tasks`, `taskboard.filter`) are used, consistent with versioning/migration being explicitly out of scope.
+
+## Residual Open Items (not blocking, tracked for awareness only)
+
+- Exact wording/placement of unit tests for the hook and type guards is left to the implementation phase; no test framework is currently configured in `package.json`.
