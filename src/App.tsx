@@ -1,4 +1,5 @@
 import { FormEvent, useState } from 'react';
+import { useLocalStorageState } from './hooks/useLocalStorageState';
 import './App.css';
 
 type Task = {
@@ -8,17 +9,48 @@ type Task = {
   priority: 'Low' | 'Medium' | 'High';
 };
 
+// Retained for reference only (see requirements.md Assumptions and
+// architecture.md Agreed Decision 9) — must never again be used as the
+// default seed for the `tasks` state. First load with no persisted data
+// now starts from an empty list (FR-005 / BR-001).
 const starterTasks: Task[] = [
   { id: 1, title: 'Review the landing copy', status: 'open', priority: 'High' },
   { id: 2, title: 'Prepare demo data', status: 'open', priority: 'Medium' },
   { id: 3, title: 'Send summary to the team', status: 'done', priority: 'Low' },
 ];
 
+function isTask(value: unknown): value is Task {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const candidate = value as Record<string, unknown>;
+
+  return (
+    typeof candidate.id === 'number' &&
+    typeof candidate.title === 'string' &&
+    (candidate.status === 'open' || candidate.status === 'done') &&
+    (candidate.priority === 'Low' || candidate.priority === 'Medium' || candidate.priority === 'High')
+  );
+}
+
+function isTaskArray(value: unknown): value is Task[] {
+  return Array.isArray(value) && value.every(isTask);
+}
+
+function isFilterValue(value: unknown): value is 'all' | Task['status'] {
+  return value === 'all' || value === 'open' || value === 'done';
+}
+
 function App() {
-  const [tasks, setTasks] = useState<Task[]>(starterTasks);
+  const [tasks, setTasks] = useLocalStorageState<Task[]>('taskboard.tasks', [], isTaskArray);
   const [title, setTitle] = useState('');
   const [priority, setPriority] = useState<Task['priority']>('Medium');
-  const [filter, setFilter] = useState<'all' | Task['status']>('all');
+  const [filter, setFilter] = useLocalStorageState<'all' | Task['status']>(
+    'taskboard.filter',
+    'all',
+    isFilterValue,
+  );
 
   const visibleTasks = tasks.filter((task) => filter === 'all' || task.status === filter);
   const completedCount = tasks.filter((task) => task.status === 'done').length;
