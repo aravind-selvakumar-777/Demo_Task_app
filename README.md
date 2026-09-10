@@ -19,7 +19,9 @@ Demo Task Board is a compact sample web app built with Vite, React, and TypeScri
 
 ## Overview
 
-The application is intentionally limited in scope so it is easy to understand, run, and extend. It stores tasks in React component state only, which means the task list resets when the page is refreshed. This makes it suitable for demos, learning React state management, UI experimentation, or as a starting point for a larger app.
+The application is intentionally limited in scope so it is easy to understand, run, and extend.
+
+**Persistence:** tasks are stored in **`localStorage`**, so your task list (including edits) remains after a refresh.
 
 ## Features
 
@@ -30,7 +32,12 @@ The application is intentionally limited in scope so it is easy to understand, r
 - Delete tasks from the board.
 - Filter tasks by `all`, `open`, or `done`.
 - View live counts for total, open, and completed tasks.
-- Responsive layout for desktop and mobile screens.
+- **Inline edit** existing tasks:
+  - Click **Edit** or double-click a task title to enter edit mode.
+  - **Save** via the Save button or the **Enter** key.
+  - **Cancel** via the Cancel button or the **Escape** key.
+  - Title is validated (cannot be empty) and shows an inline error: **"Title cannot be empty"**.
+  - Only one task can be edited at a time (switching to another task discards unsaved changes).
 
 ## Tech Stack
 
@@ -51,11 +58,13 @@ Demo_app/
 ├── tsconfig.node.json
 ├── vite.config.ts
 └── src/
-		├── App.css
-		├── App.tsx
-		├── index.css
-		├── main.tsx
-		└── vite-env.d.ts
+    ├── App.css
+    ├── App.tsx
+    ├── index.css
+    ├── main.tsx
+    ├── test/
+    │   └── setup.ts
+    └── vite-env.d.ts
 ```
 
 Key files:
@@ -113,6 +122,7 @@ npx vite --host 127.0.0.1
 | `npm run dev` | Starts the Vite development server. |
 | `npm run build` | Runs TypeScript checks and creates a production build in `dist/`. |
 | `npm run preview` | Serves the production build locally for preview. |
+| `npm run test` | Runs unit tests with Vitest. |
 
 ## How to Use the App
 
@@ -123,6 +133,10 @@ npx vite --host 127.0.0.1
 5. Select the `Done` button on a completed task to reopen it.
 6. Use the `all`, `open`, and `done` filter buttons to change the visible list.
 7. Select `Delete` to remove a task.
+8. To edit a task inline:
+   - Click **Edit** (or double-click the task title)
+   - Update title and/or priority
+   - Save with **Enter**/**Save**, or cancel with **Escape**/**Cancel**
 
 ## Application Behavior
 
@@ -130,10 +144,10 @@ Tasks use this shape internally:
 
 ```ts
 type Task = {
-	id: number;
-	title: string;
-	status: 'open' | 'done';
-	priority: 'Low' | 'Medium' | 'High';
+  id: number;
+  title: string;
+  status: 'open' | 'done';
+  priority: 'Low' | 'Medium' | 'High';
 };
 ```
 
@@ -144,7 +158,7 @@ Current behavior:
 - Newly added tasks start with `open` status.
 - The priority field resets to `Medium` after adding a task.
 - Task statistics update automatically after add, complete, reopen, or delete actions.
-- Task data is not persisted to local storage or a backend API.
+- Task data (including edits) is persisted to `localStorage`.
 
 ## Customization Guide
 
@@ -154,7 +168,6 @@ Common changes are intentionally straightforward:
 - Add more priority options by extending the `Task['priority']` union type and the priority `<select>` options.
 - Change the app title, subtitle, or labels in the JSX returned by `App`.
 - Adjust colors, spacing, and responsive behavior in `src/App.css`.
-- Add persistence by saving the `tasks` state to `localStorage` or connecting it to an API.
 
 ## Build and Preview
 
@@ -207,4 +220,4 @@ Vite will usually choose the next available port. Use the exact URL shown in the
 
 ## Notes
 
-This app is designed for demonstration purposes. It does not include authentication, routing, backend storage, API integration, automated tests, or production deployment configuration.
+This app is designed for demonstration purposes. It does not include authentication, routing, backend storage, API integration, or production deployment configuration.
