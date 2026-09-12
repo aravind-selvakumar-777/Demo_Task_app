@@ -15,11 +15,8 @@
     "test:e2e:report": "playwright show-report playwright-report/html"
   },
   "dependencies": {
-    "@vitejs/plugin-react": "latest",
-    "react": "latest",
-    "react-dom": "latest",
-    "typescript": "latest",
-    "vite": "latest"
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
@@ -28,8 +25,11 @@
     "@testing-library/user-event": "^14.6.7",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.5",
+    "@vitejs/plugin-react": "^6.1.1",
     "@vitest/coverage-v8": "^5.0.0",
     "jsdom": "^29.1.1",
+    "typescript": "^7.0.2",
+    "vite": "^8.2.2",
     "vitest": "^5.0.0"
   }
 }

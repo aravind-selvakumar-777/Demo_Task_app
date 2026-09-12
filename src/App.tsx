@@ -2,16 +2,24 @@ import { FormEvent, useEffect, useState } from 'react';
 import './App.css';
 import { loadTasks, saveTasks } from './utils/storage';
 import type { Task } from './utils/storage';
-
-const starterTasks: Task[] = [
-  { id: 1, title: 'Review the landing copy', status: 'open', priority: 'High' },
-  { id: 2, title: 'Prepare demo data', status: 'open', priority: 'Medium' },
-  { id: 3, title: 'Send summary to the team', status: 'done', priority: 'Low' },
-];
+import { starterTasks } from './fixtures/starterTasks';
 
 function getInitialTasks(): Task[] {
   const persistedTasks = loadTasks();
   return persistedTasks ?? starterTasks;
+}
+
+/**
+ * Returns a task id guaranteed not to collide with any id already present in
+ * `existingTasks`. `Date.now()` alone is not collision-safe: two tasks
+ * created within the same millisecond (plausible under fast scripted use or
+ * a double-submit) would receive the same id, and that collision would then
+ * be persisted to and silently restored from Local Storage - see
+ * review.md Finding #4.
+ */
+function getNextTaskId(existingTasks: Task[]): number {
+  const maxExistingId = existingTasks.reduce((max, task) => Math.max(max, task.id), 0);
+  return Math.max(Date.now(), maxExistingId + 1);
 }
 
 function App() {
@@ -37,7 +45,7 @@ function App() {
     }
 
     setTasks((currentTasks) => [
-      { id: Date.now(), title: trimmedTitle, status: 'open', priority },
+      { id: getNextTaskId(currentTasks), title: trimmedTitle, status: 'open', priority },
       ...currentTasks,
     ]);
     setTitle('');

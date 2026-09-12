@@ -1,4 +1,6 @@
 import { expect, type Locator, type Page } from '@playwright/test';
+import { TASKS_STORAGE_KEY } from '../../src/utils/storage';
+import { STARTER_TASK_TITLES, starterTasks } from '../../src/fixtures/starterTasks';
 
 export type Priority = 'Low' | 'Medium' | 'High';
 export type Status = 'Open' | 'Done';
@@ -9,17 +11,19 @@ export type Stats = {
   done: number;
 };
 
-/** Must match `TASKS_STORAGE_KEY` in `src/utils/storage.ts`. */
-export const TASKS_STORAGE_KEY = 'task_board.tasks.v1';
+export { TASKS_STORAGE_KEY, STARTER_TASK_TITLES };
 
-/** Titles of the default starter tasks rendered when no persisted data exists. */
-export const STARTER_TASK_TITLES = [
-  'Review the landing copy',
-  'Prepare demo data',
-  'Send summary to the team',
-];
-
-export const STARTER_STATS: Stats = { total: 3, open: 2, done: 1 };
+/**
+ * Expected stats for the default starter tasks, derived from the shared
+ * `starterTasks` fixture (src/fixtures/starterTasks.ts) rather than
+ * hardcoded here, so it stays compile-time linked to the app's actual
+ * starter data (see review.md Finding #3).
+ */
+export const STARTER_STATS: Stats = {
+  total: starterTasks.length,
+  open: starterTasks.filter((task) => task.status === 'open').length,
+  done: starterTasks.filter((task) => task.status === 'done').length,
+};
 
 /**
  * Page Object Model for the Demo Task Board app, encapsulating the DOM
