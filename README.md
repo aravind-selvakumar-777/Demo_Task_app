@@ -15,6 +15,7 @@ Demo Task Board is a compact sample web app built with Vite, React, and TypeScri
 - [Application Behavior](#application-behavior)
 - [Data Persistence (Local Storage)](#data-persistence-local-storage)
 - [Testing](#testing)
+- [End-to-End Testing (Playwright)](#end-to-end-testing-playwright)
 - [Customization Guide](#customization-guide)
 - [Build and Preview](#build-and-preview)
 - [Troubleshooting](#troubleshooting)
@@ -55,6 +56,20 @@ Demo_app/
 ├── tsconfig.node.json
 ├── vite.config.ts
 ├── vitest.config.ts
+├── playwright.config.ts
+├── e2e/
+│   ├── fixtures.ts
+│   ├── pages/
+│   │   └── task-board.page.ts
+│   ├── scenario-01-default-tasks-on-empty-storage.spec.ts
+│   ├── scenario-02-created-tasks-persist-after-reload.spec.ts
+│   ├── scenario-03-status-updates-persist-after-reload.spec.ts
+│   ├── scenario-04-deleted-tasks-do-not-reappear.spec.ts
+│   ├── scenario-05-mixed-operations-restore-state.spec.ts
+│   ├── scenario-06-stats-consistency-after-reload.spec.ts
+│   ├── scenario-07-corrupted-storage-fallback.spec.ts
+│   └── scenario-08-no-backend-required.spec.ts
+├── playwright-report/
 └── src/
     ├── App.css
     ├── App.tsx
@@ -81,6 +96,10 @@ Key files:
 - `vite.config.ts` configures Vite with the React plugin.
 - `vitest.config.ts` configures the Vitest test runner (jsdom environment, test setup file).
 - `src/test/setup.ts` registers `@testing-library/jest-dom` matchers for tests.
+- `playwright.config.ts` configures the Playwright end-to-end suite (browser, base URL, web server, reporters).
+- `e2e/pages/task-board.page.ts` is the Page Object Model used by every Playwright scenario.
+- `e2e/fixtures.ts` extends the base Playwright test with a `taskBoard` fixture that performs the shared Background steps (open app, clear Local Storage, reload).
+- `playwright-report/` contains the generated HTML and JSON reports from the last Playwright run.
 
 ## Prerequisites
 
@@ -132,6 +151,9 @@ npx vite --host 127.0.0.1
 | `npm test` | Runs the unit and integration test suite once (Vitest). |
 | `npm run test:watch` | Runs the test suite in watch mode. |
 | `npm run test:coverage` | Runs the test suite and prints a coverage report. |
+| `npm run test:e2e` | Runs the Playwright end-to-end suite against a production build. |
+| `npm run test:e2e:ui` | Runs the Playwright suite in interactive UI mode. |
+| `npm run test:e2e:report` | Opens the last generated Playwright HTML report. |
 
 ## How to Use the App
 
@@ -219,6 +241,41 @@ Test coverage includes:
 
 - `src/utils/__tests__/storage.test.ts` unit tests for `loadTasks`/`saveTasks`/`clearTasks`, covering the happy path, missing data, corrupted JSON, schema mismatches, and write failures.
 - `src/__tests__/App.test.tsx` integration tests verifying default tasks appear when storage is empty, saved tasks are restored on load, stats stay consistent with the restored list, and create/toggle/delete actions persist to Local Storage.
+
+## End-to-End Testing (Playwright)
+
+The project uses [Playwright](https://playwright.dev/) with TypeScript to automate the 8 Local Storage persistence scenarios defined in `test_cases.md` (Jira KAN-30): defaults on empty storage, restore on reload, corrupted-storage fallback, and persistence of create/update/delete operations together with the Total/Open/Done statistics.
+
+Install the Playwright browser binaries once (Chromium is used by default):
+
+```bash
+npx playwright install chromium
+```
+
+Run the full end-to-end suite (builds the app and serves it via `vite preview` automatically):
+
+```bash
+npm run test:e2e
+```
+
+Open the last generated HTML report:
+
+```bash
+npm run test:e2e:report
+```
+
+Test coverage includes (see `e2e/`):
+
+- `scenario-01-default-tasks-on-empty-storage.spec.ts` - Scenario 1: starter tasks and non-negative stats when Local Storage is empty.
+- `scenario-02-created-tasks-persist-after-reload.spec.ts` - Scenario Outline 2: created tasks (title, priority, `Open` status) survive a reload.
+- `scenario-03-status-updates-persist-after-reload.spec.ts` - Scenario Outline 3: marking a task Done and reopening it both persist across reloads.
+- `scenario-04-deleted-tasks-do-not-reappear.spec.ts` - Scenario Outline 4: deleted tasks stay deleted after a reload.
+- `scenario-05-mixed-operations-restore-state.spec.ts` - Scenario 5: a mix of create/update/delete operations restores correctly after reload.
+- `scenario-06-stats-consistency-after-reload.spec.ts` - Scenario Outline 6: Total/Open/Done counters stay consistent with baseline + deltas after reload.
+- `scenario-07-corrupted-storage-fallback.spec.ts` - Scenario Outline 7: invalid/corrupted Local Storage values (`NOT_JSON`, empty string, `{}`, malformed array) fall back to starter tasks without an uncaught error.
+- `scenario-08-no-backend-required.spec.ts` - Scenario 8: task creation and persistence work with no login prompt or backend dependency.
+
+Generated reports (HTML at `playwright-report/html/index.html`, JSON at `playwright-report/results.json`) are committed alongside the automation code so the latest run's results are traceable from the repository.
 
 ## Customization Guide
 
