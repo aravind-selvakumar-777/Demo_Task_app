@@ -1,12 +1,7 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import './App.css';
-
-type Task = {
-  id: number;
-  title: string;
-  status: 'open' | 'done';
-  priority: 'Low' | 'Medium' | 'High';
-};
+import { loadTasks, saveTasks } from './utils/storage';
+import type { Task } from './utils/storage';
 
 const starterTasks: Task[] = [
   { id: 1, title: 'Review the landing copy', status: 'open', priority: 'High' },
@@ -14,8 +9,13 @@ const starterTasks: Task[] = [
   { id: 3, title: 'Send summary to the team', status: 'done', priority: 'Low' },
 ];
 
+function getInitialTasks(): Task[] {
+  const persistedTasks = loadTasks();
+  return persistedTasks ?? starterTasks;
+}
+
 function App() {
-  const [tasks, setTasks] = useState<Task[]>(starterTasks);
+  const [tasks, setTasks] = useState<Task[]>(getInitialTasks);
   const [title, setTitle] = useState('');
   const [priority, setPriority] = useState<Task['priority']>('Medium');
   const [filter, setFilter] = useState<'all' | Task['status']>('all');
@@ -23,6 +23,10 @@ function App() {
   const visibleTasks = tasks.filter((task) => filter === 'all' || task.status === filter);
   const completedCount = tasks.filter((task) => task.status === 'done').length;
   const openCount = tasks.length - completedCount;
+
+  useEffect(() => {
+    saveTasks(tasks);
+  }, [tasks]);
 
   function addTask(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
