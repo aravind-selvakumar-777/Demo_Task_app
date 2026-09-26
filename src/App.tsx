@@ -1,5 +1,6 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent } from 'react';
 import './App.css';
+import { useLocalStorageState } from './hooks/useLocalStorageState';
 
 type Task = {
   id: number;
@@ -8,17 +9,59 @@ type Task = {
   priority: 'Low' | 'Medium' | 'High';
 };
 
+type Filter = 'all' | Task['status'];
+
+const STORAGE_KEYS = {
+  tasks: 'demo-task-board-tasks',
+  filter: 'demo-task-board-filter',
+} as const;
+
 const starterTasks: Task[] = [
   { id: 1, title: 'Review the landing copy', status: 'open', priority: 'High' },
   { id: 2, title: 'Prepare demo data', status: 'open', priority: 'Medium' },
   { id: 3, title: 'Send summary to the team', status: 'done', priority: 'Low' },
 ];
 
+function isTask(value: unknown): value is Task {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const task = value as Record<string, unknown>;
+  return (
+    typeof task.id === 'number' &&
+    typeof task.title === 'string' &&
+    (task.status === 'open' || task.status === 'done') &&
+    (task.priority === 'Low' || task.priority === 'Medium' || task.priority === 'High')
+  );
+}
+
+function isTaskArray(value: unknown): value is Task[] {
+  return Array.isArray(value) && value.every(isTask);
+}
+
+function isFilter(value: unknown): value is Filter {
+  return value === 'all' || value === 'open' || value === 'done';
+}
+
 function App() {
-  const [tasks, setTasks] = useState<Task[]>(starterTasks);
-  const [title, setTitle] = useState('');
-  const [priority, setPriority] = useState<Task['priority']>('Medium');
-  const [filter, setFilter] = useState<'all' | Task['status']>('all');
+  const [tasks, setTasks] = useLocalStorageState<Task[]>(STORAGE_KEYS.tasks, starterTasks, {
+    validate: isTaskArray,
+  });
+
+  const [title, setTitle] = useLocalStorageState<string>('demo-task-board-draft-title', '');
+  const [priority, setPriority] = useLocalStorageState<Task['priority']>(
+    'demo-task-board-draft-priority',
+    'Medium',
+    {
+      validate: (value: unknown): value is Task['priority'] =>
+        value === 'Low' || value === 'Medium' || value === 'High',
+    },
+  );
+
+  const [filter, setFilter] = useLocalStorageState<Filter>(STORAGE_KEYS.filter, 'all', {
+    validate: isFilter,
+  });
 
   const visibleTasks = tasks.filter((task) => filter === 'all' || task.status === filter);
   const completedCount = tasks.filter((task) => task.status === 'done').length;
