@@ -1,12 +1,8 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import './App.css';
+import { readTasksFromStorage, Task, writeTasksToStorage } from './storage/tasksStorage';
 
-type Task = {
-  id: number;
-  title: string;
-  status: 'open' | 'done';
-  priority: 'Low' | 'Medium' | 'High';
-};
+type TaskFilter = 'all' | Task['status'];
 
 const starterTasks: Task[] = [
   { id: 1, title: 'Review the landing copy', status: 'open', priority: 'High' },
@@ -15,10 +11,17 @@ const starterTasks: Task[] = [
 ];
 
 function App() {
-  const [tasks, setTasks] = useState<Task[]>(starterTasks);
+  const [tasks, setTasks] = useState<Task[]>(() => readTasksFromStorage() ?? starterTasks);
   const [title, setTitle] = useState('');
   const [priority, setPriority] = useState<Task['priority']>('Medium');
-  const [filter, setFilter] = useState<'all' | Task['status']>('all');
+  const [filter, setFilter] = useState<TaskFilter>('all');
+
+  useEffect(() => {
+    // Ensure default starter tasks are persisted once per fresh load.
+    // This is required so that refresh restores the same list.
+    writeTasksToStorage(tasks);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const visibleTasks = tasks.filter((task) => filter === 'all' || task.status === filter);
   const completedCount = tasks.filter((task) => task.status === 'done').length;
@@ -32,26 +35,37 @@ function App() {
       return;
     }
 
-    setTasks((currentTasks) => [
-      { id: Date.now(), title: trimmedTitle, status: 'open', priority },
-      ...currentTasks,
-    ]);
+    setTasks((currentTasks) => {
+      const nextTasks: Task[] = [
+        { id: Date.now(), title: trimmedTitle, status: 'open', priority },
+        ...currentTasks,
+      ];
+      writeTasksToStorage(nextTasks);
+      return nextTasks;
+    });
+
     setTitle('');
     setPriority('Medium');
   }
 
   function toggleTask(taskId: number) {
-    setTasks((currentTasks) =>
-      currentTasks.map((task) =>
+    setTasks((currentTasks) => {
+      const nextTasks: Task[] = currentTasks.map((task) =>
         task.id === taskId
-          ? { ...task, status: task.status === 'open' ? 'done' : 'open' }
+          ? { ...task, status: task.status === 'open' ? ('done' as const) : ('open' as const) }
           : task,
-      ),
-    );
+      );
+      writeTasksToStorage(nextTasks);
+      return nextTasks;
+    });
   }
 
   function deleteTask(taskId: number) {
-    setTasks((currentTasks) => currentTasks.filter((task) => task.id !== taskId));
+    setTasks((currentTasks) => {
+      const nextTasks = currentTasks.filter((task) => task.id !== taskId);
+      writeTasksToStorage(nextTasks);
+      return nextTasks;
+    });
   }
 
   return (
@@ -83,11 +97,7 @@ function App() {
         <form className="task-form" onSubmit={addTask}>
           <label>
             <span>Task name</span>
-            <input
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-              placeholder="Add a task"
-            />
+            <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Add a task" />
           </label>
 
           <label>
