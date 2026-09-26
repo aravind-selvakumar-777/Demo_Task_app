@@ -10,7 +10,8 @@
     "verbatimModuleSyntax": true,
     "moduleDetection": "force",
     "noEmit": true,
-    "strict": true
+    "strict": true,
+    "types": ["vitest/globals"]
   },
   "include": ["vite.config.ts"]
 }

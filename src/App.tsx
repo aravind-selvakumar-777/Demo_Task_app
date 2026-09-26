@@ -1,5 +1,6 @@
 import { FormEvent, useState } from 'react';
 import './App.css';
+import { useLocalStorage } from './hooks/useLocalStorage';
 
 type Task = {
   id: number;
@@ -14,8 +15,12 @@ const starterTasks: Task[] = [
   { id: 3, title: 'Send summary to the team', status: 'done', priority: 'Low' },
 ];
 
+// Storage key constant as specified in the implementation plan
+const STORAGE_KEY = 'demo_task_board_tasks';
+
 function App() {
-  const [tasks, setTasks] = useState<Task[]>(starterTasks);
+  // Replace useState with useLocalStorage for automatic persistence
+  const [tasks, setTasks] = useLocalStorage<Task[]>(STORAGE_KEY, starterTasks);
   const [title, setTitle] = useState('');
   const [priority, setPriority] = useState<Task['priority']>('Medium');
   const [filter, setFilter] = useState<'all' | Task['status']>('all');
