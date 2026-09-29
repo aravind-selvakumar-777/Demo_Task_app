@@ -1,24 +1,21 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import './App.css';
-
-type Task = {
-  id: number;
-  title: string;
-  status: 'open' | 'done';
-  priority: 'Low' | 'Medium' | 'High';
-};
-
-const starterTasks: Task[] = [
-  { id: 1, title: 'Review the landing copy', status: 'open', priority: 'High' },
-  { id: 2, title: 'Prepare demo data', status: 'open', priority: 'Medium' },
-  { id: 3, title: 'Send summary to the team', status: 'done', priority: 'Low' },
-];
+import type { FilterOption, Task } from './types';
+import { loadFilter, loadTasks, saveFilter, saveTasks } from './storage/taskBoardStorage';
 
 function App() {
-  const [tasks, setTasks] = useState<Task[]>(starterTasks);
+  const [tasks, setTasks] = useState<Task[]>(() => loadTasks());
   const [title, setTitle] = useState('');
   const [priority, setPriority] = useState<Task['priority']>('Medium');
-  const [filter, setFilter] = useState<'all' | Task['status']>('all');
+  const [filter, setFilter] = useState<FilterOption>(() => loadFilter());
+
+  useEffect(() => {
+    saveTasks(tasks);
+  }, [tasks]);
+
+  useEffect(() => {
+    saveFilter(filter);
+  }, [filter]);
 
   const visibleTasks = tasks.filter((task) => filter === 'all' || task.status === filter);
   const completedCount = tasks.filter((task) => task.status === 'done').length;
@@ -137,7 +134,9 @@ function App() {
               </article>
             ))
           ) : (
-            <p className="empty-state">No tasks match this filter.</p>
+            <p className="empty-state">
+              {tasks.length === 0 ? 'No tasks yet — add one above.' : 'No tasks match this filter.'}
+            </p>
           )}
         </div>
       </section>
