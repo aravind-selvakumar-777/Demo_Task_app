@@ -1,6 +1,6 @@
 # Demo Task Board
 
-Demo Task Board is a compact sample web app built with Vite, React, and TypeScript. It demonstrates a small but complete task-management workflow: add tasks, assign priority, update task status, delete tasks, filter the list, and view live task counts.
+Demo Task Board is a compact sample web app built with Vite, React, and TypeScript. It demonstrates a small but complete task-management workflow: add tasks, assign priority, update task status, delete tasks, filter the list, view live task counts, and automatically persist tasks across browser sessions.
 
 ## Table of Contents
 
@@ -19,59 +19,45 @@ Demo Task Board is a compact sample web app built with Vite, React, and TypeScri
 
 ## Overview
 
-The application is intentionally limited in scope so it is easy to understand, run, and extend. It stores tasks in React component state only, which means the task list resets when the page is refreshed. This makes it suitable for demos, learning React state management, UI experimentation, or as a starting point for a larger app.
+The application is intentionally limited in scope so it is easy to understand, run, and extend. Tasks are automatically persisted to your browser's localStorage, meaning your task list is preserved when you refresh the page or return to the app later - no backend required.
 
 ## Features
 
-- Add a task with a title and priority.
-- Choose between `Low`, `Medium`, and `High` priority.
-- Mark a task as `Open` or `Done`.
-- Reopen completed tasks.
-- Delete tasks from the board.
-- Filter tasks by `all`, `open`, or `done`.
-- View live counts for total, open, and completed tasks.
-- Responsive layout for desktop and mobile screens.
+- **Add a task** with a title and priority.
+- Choose between Low, Medium, and High priority.
+- **Mark a task as Open or Done**.
+- **Reopen completed tasks**.
+- **Delete tasks** from the board.
+- **Filter tasks** by all, open, or done.
+- **View live counts** for total, open, and completed tasks.
+- **Automatic persistence** - tasks are saved to localStorage and restored on page load.
+- **Responsive layout** for desktop and mobile screens.
 
 ## Tech Stack
 
-- Vite for fast local development and production builds.
-- React for the user interface.
-- TypeScript for static typing.
-- CSS for responsive layout and visual styling.
+- **Vite** for fast local development and production builds.
+- **React** for the user interface.
+- **TypeScript** for static typing.
+- **CSS** for responsive layout and visual styling.
+- **localStorage API** for client-side persistence (no backend needed).
 
 ## Project Structure
 
-```text
-Demo_app/
-├── index.html
-├── package.json
-├── README.md
-├── tsconfig.json
-├── tsconfig.app.json
-├── tsconfig.node.json
-├── vite.config.ts
-└── src/
-		├── App.css
-		├── App.tsx
-		├── index.css
-		├── main.tsx
-		└── vite-env.d.ts
-```
-
 Key files:
 
-- `src/App.tsx` contains the task board UI, state, filters, and task actions.
-- `src/App.css` contains the main application layout and component styling.
-- `src/index.css` contains global page styles.
-- `src/main.tsx` mounts the React app into the page.
-- `vite.config.ts` configures Vite with the React plugin.
+- **src/App.tsx** contains the task board UI, state, filters, and task actions.
+- **src/useLocalStorage.ts** is a custom React hook that syncs state with browser localStorage.
+- **src/App.css** contains the main application layout and component styling.
+- **src/index.css** contains global page styles.
+- **src/main.tsx** mounts the React app into the page.
+- **vite.config.ts** configures Vite with the React plugin.
 
 ## Prerequisites
 
 Install the following before running the app:
 
-- Node.js 18 or later.
-- npm, which is included with Node.js.
+- **Node.js 18 or later**.
+- **npm**, which is included with Node.js.
 
 Check your installed versions:
 
@@ -110,19 +96,20 @@ npx vite --host 127.0.0.1
 
 | Script | Purpose |
 | --- | --- |
-| `npm run dev` | Starts the Vite development server. |
-| `npm run build` | Runs TypeScript checks and creates a production build in `dist/`. |
-| `npm run preview` | Serves the production build locally for preview. |
+| npm run dev | Starts the Vite development server. |
+| npm run build | Runs TypeScript checks and creates a production build in dist/. |
+| npm run preview | Serves the production build locally for preview. |
 
 ## How to Use the App
 
-1. Enter a task name in the `Task name` field.
-2. Select a priority from the `Priority` dropdown.
-3. Select `Add task` to add it to the board.
-4. Select the `Open` button on a task to mark it done.
-5. Select the `Done` button on a completed task to reopen it.
-6. Use the `all`, `open`, and `done` filter buttons to change the visible list.
-7. Select `Delete` to remove a task.
+1. Enter a task name in the **Task name** field.
+2. Select a priority from the **Priority** dropdown.
+3. Click **Add task** to add it to the board.
+4. Click the **Open** button on a task to mark it done.
+5. Click the **Done** button on a completed task to reopen it.
+6. Use the **all**, **open**, and **done** filter buttons to change the visible list.
+7. Click **Delete** to remove a task.
+8. **Refresh the page** - your tasks are automatically restored from localStorage.
 
 ## Application Behavior
 
@@ -130,31 +117,41 @@ Tasks use this shape internally:
 
 ```ts
 type Task = {
-	id: number;
-	title: string;
-	status: 'open' | 'done';
-	priority: 'Low' | 'Medium' | 'High';
+  id: number;
+  title: string;
+  status: 'open' | 'done';
+  priority: 'Low' | 'Medium' | 'High';
 };
 ```
 
-Current behavior:
+### Current behavior:
 
 - New tasks are inserted at the top of the list.
 - Empty task names are ignored.
-- Newly added tasks start with `open` status.
-- The priority field resets to `Medium` after adding a task.
+- Newly added tasks start with open status.
+- The priority field resets to Medium after adding a task.
 - Task statistics update automatically after add, complete, reopen, or delete actions.
-- Task data is not persisted to local storage or a backend API.
+- **Tasks are automatically saved to localStorage (key: demo_tasks) after every change.**
+- **On page load, tasks are restored from localStorage.** If no saved data exists or the data is corrupted, the app loads with three default starter tasks.
+- The filter selection (all/open/done) resets to all on each page load.
+
+### Persistence details:
+
+- **Storage key:** demo_tasks
+- **Stored data:** Full task array serialized as JSON.
+- **Error handling:** If localStorage is unavailable (e.g., private browsing mode) or storage quota is exceeded, the app logs a warning to the console and continues to work in memory-only mode.
+- **Corrupted data:** If the stored JSON is invalid, the app falls back to default starter tasks without crashing.
 
 ## Customization Guide
 
 Common changes are intentionally straightforward:
 
-- Update starter tasks in `starterTasks` inside `src/App.tsx`.
-- Add more priority options by extending the `Task['priority']` union type and the priority `<select>` options.
-- Change the app title, subtitle, or labels in the JSX returned by `App`.
-- Adjust colors, spacing, and responsive behavior in `src/App.css`.
-- Add persistence by saving the `tasks` state to `localStorage` or connecting it to an API.
+- Update starter tasks in starterTasks inside src/App.tsx.
+- Add more priority options by extending the Task['priority'] union type and the priority select options.
+- Change the app title, subtitle, or labels in the JSX returned by App.
+- Adjust colors, spacing, and responsive behavior in src/App.css.
+- Change the localStorage key by modifying the first argument to useLocalStorage in App.tsx.
+- Add backend persistence by replacing useLocalStorage with a custom hook that calls your API.
 
 ## Build and Preview
 
@@ -170,11 +167,11 @@ Preview the production build:
 npm run preview
 ```
 
-The production files are generated in the `dist/` directory.
+The production files are generated in the dist/ directory.
 
 ## Troubleshooting
 
-### `npm install` fails
+### npm install fails
 
 Make sure Node.js and npm are installed and available in your terminal:
 
@@ -183,7 +180,7 @@ node --version
 npm --version
 ```
 
-If dependencies are corrupted, delete `node_modules` and `package-lock.json`, then reinstall:
+If dependencies are corrupted, delete node_modules and package-lock.json, then reinstall:
 
 ```bash
 npm install
@@ -193,9 +190,17 @@ npm install
 
 Check the terminal where Vite is running and look for compilation errors. Also confirm you are opening the URL printed by Vite.
 
+### Tasks are not persisting
+
+Open the browser's developer console (F12) and check for:
+
+- [useLocalStorage] log messages indicating successful saves/loads.
+- Warnings about localStorage being unavailable (common in private/incognito mode).
+- Warnings about storage quota exceeded (rare, happens with extremely large task lists).
+
 ### CSS imports fail during TypeScript build
 
-Confirm `src/vite-env.d.ts` exists and contains:
+Confirm src/vite-env.d.ts exists and contains:
 
 ```ts
 /// <reference types="vite/client" />
@@ -204,6 +209,14 @@ Confirm `src/vite-env.d.ts` exists and contains:
 ### Port 5173 is already in use
 
 Vite will usually choose the next available port. Use the exact URL shown in the terminal output.
+
+### Clearing persisted tasks
+
+If you want to reset the task list to the default starter tasks:
+
+1. Open the browser developer console (F12).
+2. Run: localStorage.removeItem('demo_tasks')
+3. Refresh the page.
 
 ## Notes
 

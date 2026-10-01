@@ -1,5 +1,6 @@
 import { FormEvent, useState } from 'react';
 import './App.css';
+import { useLocalStorage } from './useLocalStorage';
 
 type Task = {
   id: number;
@@ -15,7 +16,8 @@ const starterTasks: Task[] = [
 ];
 
 function App() {
-  const [tasks, setTasks] = useState<Task[]>(starterTasks);
+  // Use localStorage hook for persistent tasks
+  const [tasks, setTasks] = useLocalStorage<Task[]>('demo_tasks', starterTasks);
   const [title, setTitle] = useState('');
   const [priority, setPriority] = useState<Task['priority']>('Medium');
   const [filter, setFilter] = useState<'all' | Task['status']>('all');
