@@ -1,12 +1,8 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent } from 'react';
 import './App.css';
-
-type Task = {
-  id: number;
-  title: string;
-  status: 'open' | 'done';
-  priority: 'Low' | 'Medium' | 'High';
-};
+import { clearTasks, isValidTaskArray, STORAGE_KEY } from './storage';
+import type { Task } from './storage';
+import { useLocalStorage } from './useLocalStorage';
 
 const starterTasks: Task[] = [
   { id: 1, title: 'Review the landing copy', status: 'open', priority: 'High' },
@@ -15,10 +11,21 @@ const starterTasks: Task[] = [
 ];
 
 function App() {
-  const [tasks, setTasks] = useState<Task[]>(starterTasks);
-  const [title, setTitle] = useState('');
-  const [priority, setPriority] = useState<Task['priority']>('Medium');
-  const [filter, setFilter] = useState<'all' | Task['status']>('all');
+  // KAN-42: persist tasks to localStorage; restore on mount; fall back to starterTasks
+  const [tasks, setTasks] = useLocalStorage<Task[]>(
+    STORAGE_KEY,
+    starterTasks,
+    isValidTaskArray,
+  );
+  const [title, setTitle] = useLocalStorage<string>('demo_task_board_title', '');
+  const [priority, setPriority] = useLocalStorage<Task['priority']>(
+    'demo_task_board_priority',
+    'Medium',
+  );
+  const [filter, setFilter] = useLocalStorage<'all' | Task['status']>(
+    'demo_task_board_filter',
+    'all',
+  );
 
   const visibleTasks = tasks.filter((task) => filter === 'all' || task.status === filter);
   const completedCount = tasks.filter((task) => task.status === 'done').length;
@@ -52,6 +59,15 @@ function App() {
 
   function deleteTask(taskId: number) {
     setTasks((currentTasks) => currentTasks.filter((task) => task.id !== taskId));
+  }
+
+  /** KAN-42: Reset board — clears localStorage and restores default starter tasks */
+  function resetToDefaults() {
+    clearTasks();
+    setTasks(starterTasks);
+    setTitle('');
+    setPriority('Medium');
+    setFilter('all');
   }
 
   return (
@@ -113,6 +129,17 @@ function App() {
               {option}
             </button>
           ))}
+
+          {/* KAN-42: Reset button — clears localStorage and reloads defaults */}
+          <button
+            className="reset-button"
+            onClick={resetToDefaults}
+            type="button"
+            aria-label="Reset board to default starter tasks"
+            title="Clear all tasks and restore defaults"
+          >
+            Reset
+          </button>
         </div>
 
         <div className="task-list" aria-live="polite">

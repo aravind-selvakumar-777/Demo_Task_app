@@ -152,6 +152,19 @@ button:hover {
   background: #1e5e55;
 }
 
+/* KAN-42: Reset button — visually distinct from filter buttons */
+.toolbar .reset-button {
+  margin-left: auto;
+  color: #7a2d24;
+  background: #f8ddd8;
+  text-transform: capitalize;
+}
+
+.toolbar .reset-button:hover {
+  background: #f0c4bc;
+  box-shadow: 0 6px 14px rgba(122, 45, 36, 0.18);
+}
+
 .task-list {
   display: grid;
   gap: 12px;

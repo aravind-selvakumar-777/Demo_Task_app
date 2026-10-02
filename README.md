@@ -1,6 +1,6 @@
 # Demo Task Board
 
-Demo Task Board is a compact sample web app built with Vite, React, and TypeScript. It demonstrates a small but complete task-management workflow: add tasks, assign priority, update task status, delete tasks, filter the list, and view live task counts.
+Demo Task Board is a compact sample web app built with Vite, React, and TypeScript. It demonstrates a small but complete task-management workflow: add tasks, assign priority, update task status, delete tasks, filter the list, and view live task counts. Tasks are **persisted to browser localStorage**, so your board survives page refreshes.
 
 ## Table of Contents
 
@@ -13,13 +13,14 @@ Demo Task Board is a compact sample web app built with Vite, React, and TypeScri
 - [Available Scripts](#available-scripts)
 - [How to Use the App](#how-to-use-the-app)
 - [Application Behavior](#application-behavior)
+- [Local Storage Persistence](#local-storage-persistence)
 - [Customization Guide](#customization-guide)
 - [Build and Preview](#build-and-preview)
 - [Troubleshooting](#troubleshooting)
 
 ## Overview
 
-The application is intentionally limited in scope so it is easy to understand, run, and extend. It stores tasks in React component state only, which means the task list resets when the page is refreshed. This makes it suitable for demos, learning React state management, UI experimentation, or as a starting point for a larger app.
+The application is intentionally limited in scope so it is easy to understand, run, and extend. Tasks are stored in browser localStorage so the board persists across page refreshes and browser restarts. This makes the app suitable for real task tracking, planning sessions, and daily standup management.
 
 ## Features
 
@@ -30,6 +31,8 @@ The application is intentionally limited in scope so it is easy to understand, r
 - Delete tasks from the board.
 - Filter tasks by `all`, `open`, or `done`.
 - View live counts for total, open, and completed tasks.
+- **Tasks persist across page refreshes** via browser localStorage.
+- **Reset button** clears localStorage and restores default starter tasks.
 - Responsive layout for desktop and mobile screens.
 
 ## Tech Stack
@@ -38,6 +41,7 @@ The application is intentionally limited in scope so it is easy to understand, r
 - React for the user interface.
 - TypeScript for static typing.
 - CSS for responsive layout and visual styling.
+- Vitest + Testing Library for unit tests.
 
 ## Project Structure
 
@@ -50,21 +54,32 @@ Demo_app/
 ├── tsconfig.app.json
 ├── tsconfig.node.json
 ├── vite.config.ts
+├── vitest.config.ts
 └── src/
-		├── App.css
-		├── App.tsx
-		├── index.css
-		├── main.tsx
-		└── vite-env.d.ts
+    ├── App.css
+    ├── App.tsx
+    ├── index.css
+    ├── main.tsx
+    ├── storage.ts
+    ├── storage.test.ts
+    ├── test-setup.ts
+    ├── useLocalStorage.ts
+    ├── useLocalStorage.test.ts
+    └── vite-env.d.ts
 ```
 
 Key files:
 
-- `src/App.tsx` contains the task board UI, state, filters, and task actions.
-- `src/App.css` contains the main application layout and component styling.
-- `src/index.css` contains global page styles.
-- `src/main.tsx` mounts the React app into the page.
-- `vite.config.ts` configures Vite with the React plugin.
+- `src/App.tsx` — task board UI, state, filters, task actions, and reset functionality.
+- `src/storage.ts` — localStorage save/load/clear utilities with data validation.
+- `src/useLocalStorage.ts` — generic React hook that synchronises state with localStorage.
+- `src/storage.test.ts` — unit tests for storage utilities.
+- `src/useLocalStorage.test.ts` — unit tests for the useLocalStorage hook.
+- `src/App.css` — main application layout and component styling.
+- `src/index.css` — global page styles.
+- `src/main.tsx` — mounts the React app into the page.
+- `vite.config.ts` — configures Vite with the React plugin.
+- `vitest.config.ts` — configures Vitest with jsdom environment.
 
 ## Prerequisites
 
@@ -113,6 +128,8 @@ npx vite --host 127.0.0.1
 | `npm run dev` | Starts the Vite development server. |
 | `npm run build` | Runs TypeScript checks and creates a production build in `dist/`. |
 | `npm run preview` | Serves the production build locally for preview. |
+| `npm test` | Runs the Vitest unit test suite once. |
+| `npm run test:watch` | Runs the Vitest suite in watch mode. |
 
 ## How to Use the App
 
@@ -123,6 +140,7 @@ npx vite --host 127.0.0.1
 5. Select the `Done` button on a completed task to reopen it.
 6. Use the `all`, `open`, and `done` filter buttons to change the visible list.
 7. Select `Delete` to remove a task.
+8. Select **`Reset`** in the toolbar to clear all tasks and restore the default starter tasks.
 
 ## Application Behavior
 
@@ -130,10 +148,10 @@ Tasks use this shape internally:
 
 ```ts
 type Task = {
-	id: number;
-	title: string;
-	status: 'open' | 'done';
-	priority: 'Low' | 'Medium' | 'High';
+  id: number;
+  title: string;
+  status: 'open' | 'done';
+  priority: 'Low' | 'Medium' | 'High';
 };
 ```
 
@@ -144,7 +162,38 @@ Current behavior:
 - Newly added tasks start with `open` status.
 - The priority field resets to `Medium` after adding a task.
 - Task statistics update automatically after add, complete, reopen, or delete actions.
-- Task data is not persisted to local storage or a backend API.
+- **Task data is persisted to localStorage** so it survives page refreshes.
+
+## Local Storage Persistence
+
+### How it works
+
+- All task data (ID, title, status, priority) is serialised to JSON and stored in `localStorage` under the key `demo_task_board_tasks` whenever any mutation occurs (add, toggle, delete).
+- On application load the stored value is read, validated, and restored to React state. If no data is present, the default starter tasks are loaded.
+- The `Reset` button clears localStorage and restores the three default starter tasks.
+
+### Data validation
+
+- On load, the stored JSON is parsed and validated. If it is malformed or contains unexpected field types, the app falls back to the default starter tasks and logs a console warning.
+
+### Known limitations
+
+| Limitation | Detail |
+| --- | --- |
+| Private / Incognito mode | localStorage may not persist between sessions in private browsing. |
+| Cross-tab consistency | Changes in one tab are not automatically reflected in other open tabs. Reload the other tab to pick up the latest state. |
+| Storage quota | If your browser's localStorage quota is exceeded (>5 MB), a console warning is shown and the latest change is not persisted. |
+
+### Clearing data manually
+
+Open the browser DevTools console and run:
+
+```js
+localStorage.removeItem('demo_task_board_tasks');
+location.reload();
+```
+
+Or click the **Reset** button in the app toolbar.
 
 ## Customization Guide
 
@@ -154,7 +203,7 @@ Common changes are intentionally straightforward:
 - Add more priority options by extending the `Task['priority']` union type and the priority `<select>` options.
 - Change the app title, subtitle, or labels in the JSX returned by `App`.
 - Adjust colors, spacing, and responsive behavior in `src/App.css`.
-- Add persistence by saving the `tasks` state to `localStorage` or connecting it to an API.
+- Change the localStorage key by updating `STORAGE_KEY` in `src/storage.ts`.
 
 ## Build and Preview
 
@@ -205,6 +254,12 @@ Confirm `src/vite-env.d.ts` exists and contains:
 
 Vite will usually choose the next available port. Use the exact URL shown in the terminal output.
 
+### Tasks are not persisting after refresh
+
+- Check whether you are in a private/incognito browsing session (localStorage may not persist).
+- Open DevTools → Application → Local Storage and verify the `demo_task_board_tasks` key is present.
+- Check the browser console for any `[TaskBoard]` warning messages.
+
 ## Notes
 
-This app is designed for demonstration purposes. It does not include authentication, routing, backend storage, API integration, automated tests, or production deployment configuration.
+This app is designed for demonstration purposes. It does not include authentication, routing, backend storage, API integration, or production deployment configuration. Unit tests are provided for the localStorage persistence layer using Vitest.
