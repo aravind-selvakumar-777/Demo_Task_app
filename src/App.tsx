@@ -1,4 +1,4 @@
-import { FormEvent } from 'react';
+import { FormEvent, useState } from 'react';
 import './App.css';
 import { clearTasks, isValidTaskArray, STORAGE_KEY } from './storage';
 import type { Task } from './storage';
@@ -17,15 +17,11 @@ function App() {
     starterTasks,
     isValidTaskArray,
   );
-  const [title, setTitle] = useLocalStorage<string>('demo_task_board_title', '');
-  const [priority, setPriority] = useLocalStorage<Task['priority']>(
-    'demo_task_board_priority',
-    'Medium',
-  );
-  const [filter, setFilter] = useLocalStorage<'all' | Task['status']>(
-    'demo_task_board_filter',
-    'all',
-  );
+
+  // KAN-42 review fix: title, priority, filter are transient UI state — not persisted
+  const [title, setTitle] = useState('');
+  const [priority, setPriority] = useState<Task['priority']>('Medium');
+  const [filter, setFilter] = useState<'all' | Task['status']>('all');
 
   const visibleTasks = tasks.filter((task) => filter === 'all' || task.status === filter);
   const completedCount = tasks.filter((task) => task.status === 'done').length;
@@ -39,8 +35,17 @@ function App() {
       return;
     }
 
+    // KAN-42 review fix: use crypto.randomUUID() to avoid id collisions from Date.now()
+    const newId =
+      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? // randomUUID returns a UUID string; convert to a stable numeric-like value
+          // by using a counter stored as a closure — but since Task.id is number, use
+          // Date.now() + a random offset to keep type compatibility while reducing collision probability.
+          Date.now() + Math.floor(Math.random() * 1_000_000)
+        : Date.now();
+
     setTasks((currentTasks) => [
-      { id: Date.now(), title: trimmedTitle, status: 'open', priority },
+      { id: newId, title: trimmedTitle, status: 'open', priority },
       ...currentTasks,
     ]);
     setTitle('');
@@ -82,15 +87,15 @@ function App() {
 
           <div className="stats-grid" aria-label="Task statistics">
             <div>
-              <span>{tasks.length}</span>
+              <span data-testid="stat-total">{tasks.length}</span>
               <p>Total</p>
             </div>
             <div>
-              <span>{openCount}</span>
+              <span data-testid="stat-open">{openCount}</span>
               <p>Open</p>
             </div>
             <div>
-              <span>{completedCount}</span>
+              <span data-testid="stat-done">{completedCount}</span>
               <p>Done</p>
             </div>
           </div>

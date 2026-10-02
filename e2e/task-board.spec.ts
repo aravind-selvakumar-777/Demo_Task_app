@@ -26,6 +26,9 @@ import { expect, Page, test } from '@playwright/test';
  *   TC-20  Reset board clears custom tasks from localStorage
  *   TC-21  Accessibility – aria-live region present
  *   TC-22  Accessibility – stats grid has aria-label
+ *
+ * KAN-42 review fix: stat assertions use data-testid locators instead of
+ * fragile CSS-order selectors (.stats-grid > div > span).
  */
 
 // ---------------------------------------------------------------------------
@@ -33,7 +36,12 @@ import { expect, Page, test } from '@playwright/test';
 // ---------------------------------------------------------------------------
 const BASE_URL = 'http://localhost:5173';
 
-/** Clear localStorage before every test so each test is isolated. */
+/**
+ * Clear localStorage before every test so each test is isolated.
+ * KAN-42 review: uses page.context().addInitScript() approach where possible;
+ * for the reload-based helper a page.evaluate + reload is acceptable since
+ * tests must first navigate to seed state before they can clear it.
+ */
 async function resetStorage(page: Page) {
   await page.evaluate(() => localStorage.clear());
   await page.reload({ waitUntil: 'domcontentloaded' });
@@ -70,10 +78,10 @@ test.describe('TC-01 / TC-02 — Initial page state', () => {
   });
 
   test('TC-02: statistics grid shows 3 total, 2 open, 1 done', async ({ page }) => {
-    const statSpans = page.locator('.stats-grid > div > span');
-    await expect(statSpans.nth(0)).toHaveText('3'); // Total
-    await expect(statSpans.nth(1)).toHaveText('2'); // Open
-    await expect(statSpans.nth(2)).toHaveText('1'); // Done
+    // KAN-42 review fix: use data-testid instead of CSS-order selector
+    await expect(page.getByTestId('stat-total')).toHaveText('3');
+    await expect(page.getByTestId('stat-open')).toHaveText('2');
+    await expect(page.getByTestId('stat-done')).toHaveText('1');
   });
 });
 
@@ -165,9 +173,9 @@ test.describe('TC-08 to TC-10 — Status toggle', () => {
     await page
       .getByRole('button', { name: /complete review the landing copy/i })
       .click();
-    const statSpans = page.locator('.stats-grid > div > span');
-    await expect(statSpans.nth(1)).toHaveText('1'); // Open
-    await expect(statSpans.nth(2)).toHaveText('2'); // Done
+    // KAN-42 review fix: use data-testid instead of CSS-order selector
+    await expect(page.getByTestId('stat-open')).toHaveText('1');
+    await expect(page.getByTestId('stat-done')).toHaveText('2');
   });
 });
 
@@ -189,8 +197,8 @@ test.describe('TC-11 to TC-13 — Task deletion', () => {
 
   test('TC-12: statistics update after deletion', async ({ page }) => {
     await page.getByRole('button', { name: /delete/i }).first().click();
-    const statSpans = page.locator('.stats-grid > div > span');
-    await expect(statSpans.nth(0)).toHaveText('2'); // Total
+    // KAN-42 review fix: use data-testid instead of CSS-order selector
+    await expect(page.getByTestId('stat-total')).toHaveText('2');
   });
 
   test('TC-13: shows empty-state message when all tasks are deleted', async ({ page }) => {
@@ -313,10 +321,10 @@ test.describe('TC-19 / TC-20 — Reset board', () => {
     await addTask(page, 'Extra 2');
     // Now stats = 5 total, 4 open, 1 done
     await clickReset(page);
-    const statSpans = page.locator('.stats-grid > div > span');
-    await expect(statSpans.nth(0)).toHaveText('3'); // Total
-    await expect(statSpans.nth(1)).toHaveText('2'); // Open
-    await expect(statSpans.nth(2)).toHaveText('1'); // Done
+    // KAN-42 review fix: use data-testid instead of CSS-order selector
+    await expect(page.getByTestId('stat-total')).toHaveText('3');
+    await expect(page.getByTestId('stat-open')).toHaveText('2');
+    await expect(page.getByTestId('stat-done')).toHaveText('1');
   });
 });
 

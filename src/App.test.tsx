@@ -3,6 +3,9 @@
  * Component-level unit tests for the Task Board App (KAN-42).
  * Covers: rendering, task creation, status toggle, deletion, filtering,
  *         localStorage persistence, reset functionality, and statistics.
+ *
+ * KAN-42 review fix: stat assertions use data-testid locators instead of
+ * fragile CSS-order selectors (.stats-grid > div > span).
  */
 
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
@@ -66,10 +69,10 @@ describe('Initial render', () => {
 
   it('displays correct initial statistics (3 total, 2 open, 1 done)', () => {
     renderApp();
-    const statSpans = document.querySelectorAll('.stats-grid > div > span');
-    expect(statSpans[0].textContent).toBe('3'); // Total
-    expect(statSpans[1].textContent).toBe('2'); // Open
-    expect(statSpans[2].textContent).toBe('1'); // Done
+    // KAN-42 review fix: use data-testid instead of CSS-order selector
+    expect(screen.getByTestId('stat-total').textContent).toBe('3');
+    expect(screen.getByTestId('stat-open').textContent).toBe('2');
+    expect(screen.getByTestId('stat-done').textContent).toBe('1');
   });
 
   it('renders the task input field and priority selector', () => {
@@ -163,9 +166,9 @@ describe('Task creation', () => {
   it('statistics update after adding a task', () => {
     renderApp();
     addTask('Stats Task');
-    const statSpans = document.querySelectorAll('.stats-grid > div > span');
-    expect(statSpans[0].textContent).toBe('4'); // Total
-    expect(statSpans[1].textContent).toBe('3'); // Open
+    // KAN-42 review fix: use data-testid instead of CSS-order selector
+    expect(screen.getByTestId('stat-total').textContent).toBe('4');
+    expect(screen.getByTestId('stat-open').textContent).toBe('3');
   });
 });
 
@@ -213,9 +216,9 @@ describe('Status toggle', () => {
       screen.getByRole('button', { name: /complete review the landing copy/i }),
     );
     // Now done = 2, open = 1
-    const statSpans = document.querySelectorAll('.stats-grid > div > span');
-    expect(statSpans[2].textContent).toBe('2'); // Done count
-    expect(statSpans[1].textContent).toBe('1'); // Open count
+    // KAN-42 review fix: use data-testid instead of CSS-order selector
+    expect(screen.getByTestId('stat-done').textContent).toBe('2');
+    expect(screen.getByTestId('stat-open').textContent).toBe('1');
   });
 });
 
@@ -243,8 +246,8 @@ describe('Task deletion', () => {
     renderApp();
     const deleteButtons = screen.getAllByRole('button', { name: /delete/i });
     fireEvent.click(deleteButtons[0]);
-    const statSpans = document.querySelectorAll('.stats-grid > div > span');
-    expect(statSpans[0].textContent).toBe('2'); // Total
+    // KAN-42 review fix: use data-testid instead of CSS-order selector
+    expect(screen.getByTestId('stat-total').textContent).toBe('2');
   });
 
   it('shows empty-state message when all tasks are deleted', () => {
@@ -390,8 +393,10 @@ describe('Reset functionality', () => {
     addTask('Extra Task');
     addTask('Another Extra');
     fireEvent.click(screen.getByRole('button', { name: /reset/i }));
-    const statSpans = document.querySelectorAll('.stats-grid > div > span');
-    expect(statSpans[0].textContent).toBe('3'); // Total back to 3
+    // KAN-42 review fix: use data-testid instead of CSS-order selector
+    expect(screen.getByTestId('stat-total').textContent).toBe('3');
+    expect(screen.getByTestId('stat-open').textContent).toBe('2');
+    expect(screen.getByTestId('stat-done').textContent).toBe('1');
   });
 });
 
@@ -401,19 +406,18 @@ describe('Reset functionality', () => {
 describe('Task statistics', () => {
   it('shows correct Total, Open, Done counts for starter tasks', () => {
     renderApp();
-    const statSpans = document.querySelectorAll('.stats-grid > div > span');
-    expect(statSpans[0].textContent).toBe('3'); // Total
-    expect(statSpans[1].textContent).toBe('2'); // Open
-    expect(statSpans[2].textContent).toBe('1'); // Done
+    // KAN-42 review fix: use data-testid instead of CSS-order selector
+    expect(screen.getByTestId('stat-total').textContent).toBe('3');
+    expect(screen.getByTestId('stat-open').textContent).toBe('2');
+    expect(screen.getByTestId('stat-done').textContent).toBe('1');
   });
 
   it('updates Open count when a task is added', () => {
     renderApp();
     addTask('New Open Task');
-    const statSpans = document.querySelectorAll('.stats-grid > div > span');
-    expect(statSpans[0].textContent).toBe('4'); // Total
-    expect(statSpans[1].textContent).toBe('3'); // Open
-    expect(statSpans[2].textContent).toBe('1'); // Done
+    expect(screen.getByTestId('stat-total').textContent).toBe('4');
+    expect(screen.getByTestId('stat-open').textContent).toBe('3');
+    expect(screen.getByTestId('stat-done').textContent).toBe('1');
   });
 
   it('updates counts when a task is toggled to Done', () => {
@@ -421,9 +425,8 @@ describe('Task statistics', () => {
     fireEvent.click(
       screen.getByRole('button', { name: /complete review the landing copy/i }),
     );
-    const statSpans = document.querySelectorAll('.stats-grid > div > span');
-    expect(statSpans[1].textContent).toBe('1'); // Open
-    expect(statSpans[2].textContent).toBe('2'); // Done
+    expect(screen.getByTestId('stat-open').textContent).toBe('1');
+    expect(screen.getByTestId('stat-done').textContent).toBe('2');
   });
 
   it('updates counts when all tasks are deleted', () => {
@@ -433,10 +436,9 @@ describe('Task statistics', () => {
       fireEvent.click(deleteButtons[0]);
       deleteButtons = screen.queryAllByRole('button', { name: /delete/i });
     }
-    const statSpans = document.querySelectorAll('.stats-grid > div > span');
-    expect(statSpans[0].textContent).toBe('0'); // Total
-    expect(statSpans[1].textContent).toBe('0'); // Open
-    expect(statSpans[2].textContent).toBe('0'); // Done
+    expect(screen.getByTestId('stat-total').textContent).toBe('0');
+    expect(screen.getByTestId('stat-open').textContent).toBe('0');
+    expect(screen.getByTestId('stat-done').textContent).toBe('0');
   });
 });
 

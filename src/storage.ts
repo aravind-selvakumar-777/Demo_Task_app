@@ -37,13 +37,16 @@ export function isValidTaskArray(value: unknown): value is Task[] {
  * Persist the task list to localStorage.
  * Silently no-ops if storage is unavailable (e.g. private/incognito mode with
  * quota exhausted) and logs a warning instead.
+ * KAN-42 review fix: verbose logging is gated behind DEV mode only.
  */
 export function saveTasks(tasks: Task[]): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
   } catch (error) {
     // Storage quota exceeded or unavailable (e.g. private browsing)
-    console.warn('[TaskBoard] Could not save tasks to localStorage:', error);
+    if (import.meta.env.DEV) {
+      console.warn('[TaskBoard] Could not save tasks to localStorage:', String(error));
+    }
   }
 }
 
@@ -51,6 +54,7 @@ export function saveTasks(tasks: Task[]): void {
  * Load tasks from localStorage.
  * Returns null when no data is stored or the stored data is corrupted,
  * in which case the caller should use the default starter tasks.
+ * KAN-42 review fix: verbose logging is gated behind DEV mode only.
  */
 export function loadTasks(): Task[] | null {
   try {
@@ -63,12 +67,16 @@ export function loadTasks(): Task[] | null {
     }
 
     // Corrupted data — warn and signal fallback
-    console.warn(
-      '[TaskBoard] Stored task data is corrupted. Falling back to default starter tasks.',
-    );
+    if (import.meta.env.DEV) {
+      console.warn(
+        '[TaskBoard] Stored task data is corrupted. Falling back to default starter tasks.',
+      );
+    }
     return null;
   } catch (error) {
-    console.warn('[TaskBoard] Failed to read tasks from localStorage:', error);
+    if (import.meta.env.DEV) {
+      console.warn('[TaskBoard] Failed to read tasks from localStorage:', String(error));
+    }
     return null;
   }
 }
@@ -81,6 +89,8 @@ export function clearTasks(): void {
   try {
     localStorage.removeItem(STORAGE_KEY);
   } catch (error) {
-    console.warn('[TaskBoard] Could not clear tasks from localStorage:', error);
+    if (import.meta.env.DEV) {
+      console.warn('[TaskBoard] Could not clear tasks from localStorage:', String(error));
+    }
   }
 }

@@ -45,15 +45,15 @@ Demo Task Board currently stores all tasks only in browser memory through React 
 
 ### Acceptance Criteria
 
- - [X ] Given the task board is open with tasks created, when the user refreshes the page, then all tasks and their current state (title, priority, status) are restored exactly as they were before refresh.
+ - [x] Given the task board is open with tasks created, when the user refreshes the page, then all tasks and their current state (title, priority, status) are restored exactly as they were before refresh.
 
- - [X ] Given the user creates a new task and assigns it a priority, when the page is refreshed, then the new task is visible with the correct priority and Open status.
+ - [x] Given the user creates a new task and assigns it a priority, when the page is refreshed, then the new task is visible with the correct priority and Open status.
 
-  - [X ] Given the user marks a task as Done and deletes another task, when the page is refreshed, then the Done task remains marked as Done and the deleted task is not restored.
+ - [x] Given the user marks a task as Done and deletes another task, when the page is refreshed, then the Done task remains marked as Done and the deleted task is not restored.
 
-  - [X ] Given the browser's local storage is cleared, when the user opens the task board, then the application loads with default starter tasks.
+ - [x] Given the browser's local storage is cleared, when the user opens the task board, then the application loads with default starter tasks.
 
-  - [X ] Given the user is using the task board on mobile, when tasks are created and the browser is refreshed, then tasks persist correctly on mobile devices as well.
+ - [x] Given the user is using the task board on mobile, when tasks are created and the browser is refreshed, then tasks persist correctly on mobile devices as well.
 
 ---
 
@@ -111,75 +111,147 @@ Demo Task Board currently stores all tasks only in browser memory through React 
 
 ## Assumptions
 
-1. Task structure includes:** `id` (string/UUID), **title** (string), **status** (Open | In Progress | Done), **priority** (Low | Medium | High), optional timestamps
+1. Task structure includes: `id` (number), **title** (string), **status** (`open` | `done`), **priority** (`Low` | `Medium` | `High`)
 
-2. Task state is managed via central React state hook (`useState`) or context provider
+2. Task state is managed via central React state hook (`useState`) or a custom `useLocalStorage` hook
 
 3. Default tasks are pre-defined and available to load when storage is empty or corrupt
 
 4. No external libraries are required; native browser Local Storage API is sufficient
 
-5. Storage key is configurable (e.g., `taskBoardTasks`)
+5. Storage key is configurable (e.g., `demo_task_board_tasks`)
 
 ---
 
 ## Proposed Design
 
-### Arcitecture Overview
+### Architecture Overview
 
 **Component Hierarchy**:
 
 - `App.tsx` (Root)
-   // Mount effect to comp local storage activates here
-   - `DemoTaskBoard.tsx` (Component)
-      - Task state heore
-      - Fetch from local storage or defaults
-      - Pass update functions to children components
-      - Save to storage on any change
+   - Mount effect to read local storage activates here
+   - Task state lives here
+   - Fetch from local storage or defaults
+   - Pass update functions to children components
+   - Save to storage on any change
 
-### Persistence Engine (New Service)
+### Persistence Engine (Utility Module)
 
-Create a new utility module: `src/services/persistance.ts`
+Create a new utility module: `src/storage.ts`
 
 ```typescript
 // Constants
-const STORAGE_KEY = 'taskBoardTasks';
+const STORAGE_KEY = 'demo_task_board_tasks';
 
 // Types
 interface Task {
-  id: string;
+  id: number;
   title: string;
-  status: 'Open' | 'In Progress' | 'Done';
+  status: 'open' | 'done';
   priority: 'Low' | 'Medium' | 'High';
-  createdAt?: number;
-  updatedAt?: number;
 }
 
 // Save tasks to local storage
-export function saveTasksToLocalStorage(tasks: Task[]]): void {
+export function saveTasks(tasks: Task[]): void {
   try {
     const jsonString = JSON.stringify(tasks);
     localStorage.setItem(STORAGE_KEY, jsonString);
-    console.log(`[Persistance] Tasks saved: ${tasks.length} items in ${jsonString.length} bytes`);
   } catch (error) {
-    console.error('[Persistance] Failed to save tasks:', error);
-    // Handle quota exceeded or other native storage errors
+    if (import.meta.env.DEV) {
+      console.warn('[TaskBoard] Failed to save tasks:', String(error));
+    }
   }
 }
 
 // Load tasks from local storage
-export function loadTasksFromLocalStorage(): Task[] | null {
+export function loadTasks(): Task[] | null {
   try {
     const storedTasks = localStorage.getItem(STORAGE_KEY);
     if (!storedTasks) return null; // No saved tasks
 
     const parsedTasks = JSON.parse(storedTasks) as Task[];
-    console.log(`[Persistance] Loaded ${parsedTasks.length} tasks from storage`);
     return parsedTasks;
   } catch (error) {
-    console.warn('[Persistance] Failed to parse stored tasks:', error);
+    if (import.meta.env.DEV) {
+      console.warn('[TaskBoard] Failed to parse stored tasks:', String(error));
+    }
     return null; // Fallback to defaults
   }
 }
+```
 
-/
+### Custom Hook
+
+Create `src/useLocalStorage.ts` — a generic React hook that wraps `useState` and automatically syncs to localStorage via a `useEffect`.
+
+---
+
+## Security Considerations
+
+- No sensitive data is stored; tasks are plain user-authored text
+- localStorage is scoped to the origin; no cross-site exposure
+- Verbose error logs (which could expose storage internals) are gated behind `import.meta.env.DEV`
+
+---
+
+## Observability
+
+- Dev-mode console warnings for storage read/write failures
+- Warnings are suppressed in production builds to avoid leaking internal details
+
+---
+
+## Testing Plan
+
+### Unit Tests (Vitest + Testing Library)
+
+- `src/storage.test.ts` — covers `saveTasks`, `loadTasks`, `clearTasks`, `isValidTaskArray`
+- `src/useLocalStorage.test.ts` — covers hook initialisation, persistence, and validation
+- `src/App.test.tsx` — covers rendering, task creation, toggle, deletion, filtering, persistence on load, reset
+
+### E2E Tests (Playwright)
+
+- `e2e/task-board.spec.ts` — 22 test cases (TC-01 through TC-22) covering all user-facing flows
+
+---
+
+## Edge Cases
+
+- Empty localStorage → fallback to starter tasks
+- Corrupted JSON in localStorage → fallback to starter tasks
+- Schema-invalid data (e.g., wrong field types) → fallback to starter tasks
+- Storage quota exceeded → silent no-op with dev-mode warning
+- Two tasks added in rapid succession → IDs use `Date.now() + random offset` to reduce collision probability
+
+---
+
+## Migration Plan
+
+No migration required — this is a greenfield persistence layer. Existing users (with no localStorage data) will automatically see starter tasks on first load.
+
+---
+
+## Risks & Mitigations
+
+| Risk | Mitigation |
+|---|---|
+| localStorage unavailable (private browsing) | Try/catch around all storage calls; silent no-op |
+| Corrupted stored data | Schema validation via `isValidTaskArray`; fallback to defaults |
+| ID collisions | `Date.now() + Math.random()` offset reduces probability; future improvement: `crypto.randomUUID()` with string IDs |
+| Breaking version changes in dependencies | All dependencies pinned to semver ranges in `package.json`; `engines` field specifies required Node version |
+
+---
+
+## Engineering Checklist
+
+- [x] `src/storage.ts` — `saveTasks`, `loadTasks`, `clearTasks`, `isValidTaskArray`
+- [x] `src/useLocalStorage.ts` — generic hook with optional validator
+- [x] `src/App.tsx` — uses `useLocalStorage` for tasks only; `title`/`priority`/`filter` use plain `useState`
+- [x] Reset button implemented with `aria-label`
+- [x] `data-testid` attributes on stat spans for stable E2E selectors
+- [x] All `console.warn` calls gated behind `import.meta.env.DEV`
+- [x] Dependencies pinned to semver ranges; `engines` field added to `package.json`
+- [x] Unit tests: 78 passing
+- [x] E2E tests: 22 scenarios
+- [x] README updated
